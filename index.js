@@ -2,6 +2,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const app = express();
 const cookie = require("cookie-parser");
+require("dotenv").config();
 
 app.use(express.json({ limit: "5000mb" }));
 
@@ -16,7 +17,8 @@ app.use((req, res, next) => {
   next();
 });
 
-const port = 8000;
+const port = process.env.MYSQL_PORT;
+
 
 require("./database");
 const routes = require("./routes");
@@ -28,6 +30,6 @@ app.use(routes);
 // });
 
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`serveur Node écoutant sur le port ${port}`);
 });
