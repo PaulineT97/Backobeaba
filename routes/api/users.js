@@ -246,6 +246,7 @@ router.get("/resetPassword/:email", (req, res) => {
     const sqlSearchMail = "SELECT * FROM adherents WHERE email = ?";
     connection.query(sqlSearchMail, [email], (err, result) => {
         if (err) throw err;
+
         if (result.length !== 0) {
             const confirmLink = `http://localhost:3000/ResetPassword?email=${email}`;
             const mailOptions = {
@@ -254,6 +255,7 @@ router.get("/resetPassword/:email", (req, res) => {
                 subject: "Mot de passe oublié Obeaba",
                 text: `Cliquez sur ce lien pour modifier votre mot de passe : ${confirmLink}`,
             };
+
             transporter.sendMail(mailOptions, (err, info) => {
                 if (err) {
                     throw err;
@@ -261,6 +263,8 @@ router.get("/resetPassword/:email", (req, res) => {
                     res.end();
                 }
             });
+        } else {
+            res.status(404).send("Email non trouvé dans la base de données");
         }
     });
 });
@@ -312,7 +316,5 @@ router.post("/deleteUserBDD", (req, res) => {
 
     });
 });
-
-
 
 module.exports = router;
