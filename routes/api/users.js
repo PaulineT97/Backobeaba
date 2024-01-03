@@ -119,14 +119,14 @@ router.post("/register", (req, res) => {
     })
 })
 
-router.post("/update", (req, res) => {
+router.patch("/update", (req, res) => {
     console.log("Received request to update:", req.body);
     const idAd = req.body.idAdher;
     const { nom, prenom, email } = req.body;
-    const verifyMailSql = `SELECT * FROM adherents WHERE email="${email}"`;
-    connection.query(verifyMailSql, [email], async (err, result) => {
+    const verifyMailSql = `SELECT idAdher, email FROM adherents WHERE email = ? AND idAdher != ?`;
+    connection.query(verifyMailSql, [email, idAd], async (err, result) => {
         if (err) throw err;
-        if (result.length > 0 && req.body.email !== result[0].email) {
+        if (result.length > 0) {
 
             let message = { message: "Cet email est déjà associé à un compte" };
             res.send(message)
@@ -174,6 +174,57 @@ router.post("/changePassword/:email", async (req, res) => {
         console.error(error);
         res.status(500).send("Internal Server Error");
     }
+});
+
+router.get("/resetPassword/:email", (req, res) => {
+    console.log(req.params);
+    const email = req.params.email;
+    const sqlSearchMail = "SELECT * FROM adherents WHERE email = ?";
+    connection.query(sqlSearchMail, [email], (err, result) => {
+        if (err) throw err;
+
+        if (result.length !== 0) {
+            const confirmLink = `http://localhost:3000/ResetPassword?email=${email}`;
+            const mailOptions = {
+                from: "obeaba@fauxmail.com",
+                to: email,
+                subject: "Mot de passe oublié Obeaba",
+                text: `Cliquez sur ce lien pour modifier votre mot de passe : ${confirmLink}`,
+            };
+
+            transporter.sendMail(mailOptions, (err, info) => {
+                if (err) {
+                    throw err;
+                } else {
+                    res.end();
+                }
+            });
+        } else {
+            res.status(404).send("Email non trouvé dans la base de données");
+        }
+    });
+});
+
+router.post("/contactUs", (req, res) => {
+    console.log(req.body);
+    const email = req.body.email;
+    const motif = req.body.motif;
+
+    const mailOptions = {
+        from: email,
+        to: 'pauline.todeschini@gmail.com',
+        subject: "Formulaire de contact Obeaba",
+        text: `${motif}. Répondre à : ${email}`,
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+        if (err) {
+            throw err;
+        } else {
+            const successMessage = "Nous avons bien reçu votre demande, nous répondrons dans les plus brefs délais (comptez environ 1 semaine).";
+            res.json({ messageGood: successMessage });
+        }
+    });
 });
 
 //NOTE - récupérer les infos du user lors de sa connexion 
@@ -240,35 +291,6 @@ router.delete('/logout', (req, res) => {
     res.end();
 });
 
-router.get("/resetPassword/:email", (req, res) => {
-    console.log(req.params);
-    const email = req.params.email;
-    const sqlSearchMail = "SELECT * FROM adherents WHERE email = ?";
-    connection.query(sqlSearchMail, [email], (err, result) => {
-        if (err) throw err;
-
-        if (result.length !== 0) {
-            const confirmLink = `http://localhost:3000/ResetPassword?email=${email}`;
-            const mailOptions = {
-                from: "obeaba@fauxmail.com",
-                to: email,
-                subject: "Mot de passe oublié Obeaba",
-                text: `Cliquez sur ce lien pour modifier votre mot de passe : ${confirmLink}`,
-            };
-
-            transporter.sendMail(mailOptions, (err, info) => {
-                if (err) {
-                    throw err;
-                } else {
-                    res.end();
-                }
-            });
-        } else {
-            res.status(404).send("Email non trouvé dans la base de données");
-        }
-    });
-});
-
 router.post("/deleteUserBDD", (req, res) => {
     const idAd = req.body.idAd;
     console.log(idAd);
@@ -316,5 +338,7 @@ router.post("/deleteUserBDD", (req, res) => {
 
     });
 });
+
+
 
 module.exports = router;
