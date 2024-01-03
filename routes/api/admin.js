@@ -43,41 +43,63 @@ router.post("/addEducator", async (req, res) => {
 
     console.log(req.body);
 
-    const newEduc = [];
     // Démarrer une transaction pour garantir la cohérence des données
     try {
         // Insérer l'éducateur
         const sqlEducateur = "INSERT INTO educateurs (nom, introduction, photo) VALUES (?,?,?)";
         const valuesEducateur = [nom, introduction, photo];
 
-        connection.query(sqlEducateur, valuesEducateur, (err, result) => {
-            if (err) throw err;
-            let resultBack = req.body;
-            resultBack.id = result.insertId;
-
-            const nouvellementAjouteIdEducateur = result.insertId;
-            console.log("Resultat de l'éducateur:", result);
-            console.log("Nouvel ID de l'éducateur:", nouvellementAjouteIdEducateur);
-
-            // Insérer la certification en utilisant l'identifiant de l'éducateur
-            const sqlCertification = "INSERT INTO possede (idCertification, idEduc) VALUES (?,?)";
-            const valuesCertification = [certification, nouvellementAjouteIdEducateur];
-
-            connection.query(sqlCertification, valuesCertification);
-
-            // Utiliser l'identifiant pour récupérer l'éducateur nouvellement ajouté
-            const nouvelEducateur = (connection.query("SELECT * FROM educateurs WHERE idEduc = ?", [nouvellementAjouteIdEducateur]))[0];
-
-            newEduc.push(nouvelEducateur)
-
+        const insertEducateurResult = await new Promise((resolve, reject) => {
+            connection.query(sqlEducateur, valuesEducateur, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
         });
+
+        const nouvellementAjouteIdEducateur = insertEducateurResult.insertId;
+        console.log("Resultat de l'éducateur:", insertEducateurResult);
+        console.log("Nouvel ID de l'éducateur:", nouvellementAjouteIdEducateur);
+
+        // Insérer la certification en utilisant l'identifiant de l'éducateur
+        const sqlCertification = "INSERT INTO possede (idCertification, idEduc) VALUES (?,?)";
+        const valuesCertification = [certification, nouvellementAjouteIdEducateur];
+
+        await new Promise((resolve, reject) => {
+            connection.query(sqlCertification, valuesCertification, (err, result) => {
+                if (err) reject(err);
+                else resolve(result);
+            });
+        });
+
+        // Utiliser l'identifiant pour récupérer l'éducateur nouvellement ajouté
+        const nouvelEducateurQuery = `
+        SELECT educateurs.*, certification.nameCertification
+        FROM educateurs
+        LEFT JOIN possede ON educateurs.idEduc = possede.idEduc
+        LEFT JOIN certification ON possede.idCertification = certification.idCertification
+        WHERE educateurs.idEduc = ?
+    `;
+
+        const nouvelEducateur = await new Promise((resolve, reject) => {
+            connection.query(nouvelEducateurQuery, [nouvellementAjouteIdEducateur], (err, results) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    // Récupérer le premier résultat (il devrait y en avoir qu'un puisque l'ID est unique)
+                    const nouvelEducateur = results[0];
+                    resolve(nouvelEducateur);
+                }
+            });
+        });
+
+        const newEduc = [nouvelEducateur];
+        let message = { messageGood: "L'éducateur a bien été ajouté", newEduc };
+        res.send(message);
 
     } catch (err) {
         console.error(err);
         return res.status(500).json({ message: "Erreur lors de l'ajout de l'éducateur et de sa certification." });
     }
-    let message = { messageGood: "L'éducateur a bien été ajouté", newEduc };
-    res.send(message);
 });
 
 router.delete('/deleteEducateur/:educateurId', async (req, res) => {
@@ -174,12 +196,11 @@ router.delete('/deleteAdherent/:adherentId', async (req, res) => {
     });
 });
 
-
 //NOTE - gestion des CHIENS
 
 router.get("/getDogs", (req, res) => {
     try {
-        const sqlSelect = "SELECT chiens.idChien, chiens.nomChien, chiens.naissance, chiens.race, pratiquer.level, activites.nomActivites FROM chiens LEFT JOIN pratiquer ON chiens.idChien = pratiquer.idChien LEFT JOIN activites ON pratiquer.idActivites = activites.idActivites";
+        const sqlSelect = "SELECT chiens.idChien, chiens.nomChien, chiens.naissance, chiens.race, pratiquer.level, activites.nomActivites, activites.idActivites FROM chiens LEFT JOIN pratiquer ON chiens.idChien = pratiquer.idChien LEFT JOIN activites ON pratiquer.idActivites = activites.idActivites";
         connection.query(sqlSelect, (err, result) => {
             if (err) {
                 console.log(err);
@@ -196,5 +217,20 @@ router.get("/getDogs", (req, res) => {
         res.status(500).json({ error: "Internal Server Error" });
     }
 });
+
+router.post("/updateLevel", (req, res) => {
+    const idChien = req.body.idChien;
+    const level = req.body.level;
+    const idActivites = req.body.idActivites;
+    // console.log(`received request to update dog ${idChien} for activity ${idActivites} with level ${level}`);
+
+    const updateSql = `UPDATE pratiquer SET level = ? WHERE idChien = ${idChien} AND idActivites = ${idActivites}`;
+    connection.query(updateSql, level, async (err, result) => {
+        if (err) throw err;
+        let resultBack = req.body;
+        let message = { messageGood: "Le niveau a bien été modifié" }
+        res.send(message)
+    })
+})
 
 module.exports = router;
