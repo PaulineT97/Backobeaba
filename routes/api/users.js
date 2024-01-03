@@ -119,14 +119,14 @@ router.post("/register", (req, res) => {
     })
 })
 
-router.patch("/update", (req, res) => {
+router.post("/update", (req, res) => {
     console.log("Received request to update:", req.body);
     const idAd = req.body.idAdher;
     const { nom, prenom, email } = req.body;
-    const verifyMailSql = `SELECT idAdher, email FROM adherents WHERE email = ? AND idAdher != ?`;
-    connection.query(verifyMailSql, [email, idAd], async (err, result) => {
+    const verifyMailSql = `SELECT * FROM adherents WHERE email="${email}"`;
+    connection.query(verifyMailSql, [email], async (err, result) => {
         if (err) throw err;
-        if (result.length > 0) {
+        if (result.length > 0 && req.body.email !== result[0].email) {
 
             let message = { message: "Cet email est déjà associé à un compte" };
             res.send(message)
@@ -258,7 +258,7 @@ router.get("/resetPassword/:email", (req, res) => {
                 if (err) {
                     throw err;
                 } else {
-                    res.status(404).send("Email non trouvé dans la base de données");
+                    res.end();
                 }
             });
         }
